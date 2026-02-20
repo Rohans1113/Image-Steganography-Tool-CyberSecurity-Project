@@ -11,7 +11,7 @@ This project implements the Least Significant Bit (LSB) steganography technique.
 * **Lossless Integrity:** Enforces PNG output to prevent lossy compression algorithms (like JPEG) from destroying the concealed binary data.
 
 ## Prerequisites
-Ensure Python 3.x is installed on your system. The project requires the `Pillow` library to handle image input/output.
+Ensure Python 3 or latest python version is installed on your system. The project requires the `Pillow` library to handle image input/output.
 
 ```bash
 pip install Pillow
