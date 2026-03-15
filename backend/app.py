@@ -1,11 +1,11 @@
 import io
 from flask import Flask, request, jsonify, send_file
-from steg.image_to_image import encode_image_in_image, decode_image_from_image
 from flask_cors import CORS
 
 # Import your steganography logic modules
 from steg.text_to_text import encode_text, decode_text
 from steg.text_to_image import encode_text_in_image, decode_text_from_image
+from steg.image_to_image import encode_image_in_image, decode_image_from_image
 
 app = Flask(__name__)
 CORS(app) 
@@ -43,7 +43,6 @@ def api_encode_image():
         return jsonify({"error": "No image uploaded"}), 400
         
     file = request.files['cover_image']
-    # Note: Because we use FormData for files, we use request.form.get instead of request.json
     secret = request.form.get('secret_message', '')
     
     encoded_img, status = encode_text_in_image(file, secret)
@@ -72,9 +71,7 @@ def api_decode_image():
     
     return jsonify({"decoded_message": result})
 
-if __name__ == '__main__':
-    app.run(port=5000, debug=True)
-    
+
 # ==========================================
 # IMAGE IN IMAGE ENDPOINTS
 # ==========================================
@@ -115,3 +112,10 @@ def api_decode_img2img():
         return send_file(img_io, mimetype='image/png', as_attachment=True, download_name='stego_vault_extracted.png')
     except Exception as e:
         return jsonify({"error": str(e)}), 500
+
+
+# ==========================================
+# SERVER EXECUTION (MUST BE AT THE BOTTOM)
+# ==========================================
+if __name__ == '__main__':
+    app.run(port=5000, debug=True)
