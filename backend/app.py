@@ -139,7 +139,6 @@ def api_decode_gif():
     result = decode_text_from_gif(file)
     return jsonify({"decoded_message": result})
 
-
 # ==========================================
 # SERVER EXECUTION (MUST BE AT THE BOTTOM)
 # ==========================================
