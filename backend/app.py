@@ -2,10 +2,11 @@ import io
 from flask import Flask, request, jsonify, send_file
 from flask_cors import CORS
 
-# Import your steganography logic modules
+# Import StegoVault logic modules
 from steg.text_to_text import encode_text, decode_text
 from steg.text_to_image import encode_text_in_image, decode_text_from_image
 from steg.image_to_image import encode_image_in_image, decode_image_from_image
+from steg.text_to_gif import encode_text_in_gif, decode_text_from_gif
 
 app = Flask(__name__)
 CORS(app) 
