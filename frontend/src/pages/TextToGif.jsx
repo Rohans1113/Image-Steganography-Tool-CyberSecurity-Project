@@ -1,8 +1,7 @@
 import React, { useState } from 'react'
-import { Film, ChevronDown } from 'lucide-react'
+import { FileVideo, Info, Upload } from 'lucide-react'
 import PageLayout from '../components/PageLayout'
 import TabSwitcher from '../components/TabSwitcher'
-import UploadZone from '../components/UploadZone'
 import OutputPanel from '../components/OutputPanel'
 
 const ACCENT = '#ffc740'
@@ -16,38 +15,117 @@ const label = (text) => (
   }}>{text}</label>
 )
 
-const methods = [
-  { id: 'frame_delta', label: 'Frame Delta', desc: 'Encodes bits in pixel differences between consecutive frames' },
-  { id: 'palette_order', label: 'Palette Order', desc: 'Reorders color palette entries to encode bits in the GIF color table' },
-  { id: 'frame_delay', label: 'Frame Delay', desc: 'Encodes bits in the timing delay between animation frames' },
-]
+const textarea = (props) => (
+  <textarea
+    {...props}
+    style={{
+      width: '100%', backgroundColor: '#0f0f0f',
+      border: '1px solid #1e1e1e', borderRadius: '6px',
+      padding: '16px 18px', color: '#ffffff',
+      fontFamily: "'Space Grotesk', sans-serif",
+      fontSize: '1rem', lineHeight: 1.75,
+      resize: 'vertical', outline: 'none',
+      minHeight: props.tall ? '160px' : '120px',
+      transition: 'border-color 0.2s',
+      ...props.style,
+    }}
+    onFocus={e => e.target.style.borderColor = props.focusColor || ACCENT}
+    onBlur={e => e.target.style.borderColor = '#1e1e1e'}
+  />
+)
 
-export default function TextToGif() {
+const FileUpload = ({ onFileSelect, selectedFile, id }) => (
+  <div style={{
+    border: `1px dashed ${selectedFile ? ACCENT : '#333'}`,
+    borderRadius: '6px', padding: '2rem', textAlign: 'center',
+    backgroundColor: '#0f0f0f', cursor: 'pointer', transition: 'all 0.2s',
+  }} onClick={() => document.getElementById(id).click()}>
+    <Upload size={24} color={selectedFile ? ACCENT : '#666'} style={{ margin: '0 auto 10px' }} />
+    <p style={{ fontFamily: "'Space Grotesk', sans-serif", color: selectedFile ? '#fff' : '#666', fontSize: '0.9rem' }}>
+      {selectedFile ? selectedFile.name : 'Click to upload a GIF'}
+    </p>
+    <input
+      id={id} type="file" accept="image/gif"
+      style={{ display: 'none' }}
+      onChange={(e) => onFileSelect(e.target.files[0])}
+    />
+  </div>
+)
+
+export default function TextInGif() {
   const [mode, setMode] = useState('encrypt')
-  const [gif, setGif] = useState(null)
+  
+  const [coverGif, setCoverGif] = useState(null)
+  const [secretMsg, setSecretMsg] = useState('')
   const [stegoGif, setStegoGif] = useState(null)
-  const [secret, setSecret] = useState('')
-  const [method, setMethod] = useState('frame_delta')
-  const [output, setOutput] = useState('')
+  
+  const [output, setOutput] = useState(null) 
   const [loading, setLoading] = useState(false)
 
-  const selectedMethod = methods.find(m => m.id === method)
+  const handleRun = async () => {
+    setLoading(true);
+    setOutput(null);
 
-  const handleRun = () => {
-    setLoading(true); setOutput('')
-    setTimeout(() => {
-      setOutput(mode === 'encrypt' ? null : '// Extracted text from GIF frames will appear here')
-      setLoading(false)
-    }, 1800)
+    try {
+      if (mode === 'encrypt') {
+        if (!coverGif || !secretMsg) {
+          setOutput({ type: 'text', content: '// Error: Please provide both a Cover GIF and a Secret Message.'});
+          setLoading(false);
+          return;
+        }
+
+        const formData = new FormData();
+        formData.append('cover_gif', coverGif);
+        formData.append('secret_message', secretMsg);
+
+        const response = await fetch('http://127.0.0.1:5000/api/encode-gif', {
+          method: 'POST',
+          body: formData
+        });
+
+        if (!response.ok) throw new Error("Encoding failed");
+
+        // Backend returns the modified GIF file
+        const blob = await response.blob();
+        const imageUrl = URL.createObjectURL(blob);
+        setOutput({ type: 'image', content: imageUrl });
+
+      } else {
+        if (!stegoGif) {
+          setOutput({ type: 'text', content: '// Error: Please upload a stego GIF to decode.'});
+          setLoading(false);
+          return;
+        }
+
+        const formData = new FormData();
+        formData.append('stego_gif', stegoGif);
+
+        const response = await fetch('http://127.0.0.1:5000/api/decode-gif', {
+          method: 'POST',
+          body: formData
+        });
+
+        if (!response.ok) throw new Error("Decoding failed");
+
+        // Backend returns JSON with the extracted text
+        const data = await response.json();
+        setOutput({ type: 'text', content: data.decoded_message || 'Error: Could not decode text.' });
+      }
+    } catch (error) {
+      console.error("API Error:", error);
+      setOutput({ type: 'text', content: "// Error: Could not connect to Python backend." });
+    } finally {
+      setLoading(false);
+    }
   }
 
   return (
     <PageLayout
       title="Text in GIF"
-      subtitle="Encode secret messages across GIF animation frames using inter-frame delta encoding or palette manipulation. The animation plays normally."
-      badge="Module 04 — Steganography"
+      subtitle="Conceal text inside animated GIF files by injecting data safely past the End-Of-File (EOF) marker."
+      badge="Module 04 — EOF Steganography"
       accentColor={ACCENT}
-      icon={Film}
+      icon={FileVideo}
     >
       <div style={{ display: 'flex', flexDirection: 'column', gap: '2rem' }}>
         <TabSwitcher active={mode} onChange={setMode} accentColor={ACCENT} />
@@ -55,103 +133,21 @@ export default function TextToGif() {
         {mode === 'encrypt' ? (
           <>
             <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1.5rem' }}>
-              <div style={{ display: 'flex', flexDirection: 'column', gap: '1.5rem' }}>
-                <div>
-                  {label('GIF File (animated)')}
-                  <UploadZone accept=".gif" label="animated GIF" onFile={setGif} file={gif} accentColor={ACCENT} />
-                </div>
-                <div>
-                  {label('Encoding Method')}
-                  <div style={{ position: 'relative' }}>
-                    <select
-                      value={method}
-                      onChange={e => setMethod(e.target.value)}
-                      style={{
-                        width: '100%', backgroundColor: '#0f0f0f',
-                        border: '1px solid #1e1e1e', borderRadius: '6px',
-                        padding: '10px 40px 10px 14px', color: '#ffffff',
-                        fontFamily: "'Space Grotesk', sans-serif", fontSize: '1rem',
-                        outline: 'none', cursor: 'pointer', appearance: 'none',
-                        transition: 'border-color 0.2s',
-                      }}
-                    >
-                      {methods.map(m => <option key={m.id} value={m.id}>{m.label}</option>)}
-                    </select>
-                    <ChevronDown size={14} color="#aaa" style={{ position: 'absolute', right: '12px', top: '50%', transform: 'translateY(-50%)', pointerEvents: 'none' }} />
-                  </div>
-                  {selectedMethod && (
-                    <p style={{
-                      fontFamily: "'JetBrains Mono', monospace",
-                      fontSize: '0.75rem', color: '#888', marginTop: '6px',
-                    }}>
-                      // {selectedMethod.desc}
-                    </p>
-                  )}
-                </div>
+              <div>
+                {label('Cover GIF')}
+                <FileUpload id="upload-cover-gif" onFileSelect={setCoverGif} selectedFile={coverGif} />
               </div>
               <div>
-                {label('Secret Message to Encode')}
-                <textarea
-                  style={{
-                    width: '100%', backgroundColor: '#0f0f0f',
-                    border: '1px solid #1e1e1e', borderRadius: '6px',
-                    padding: '16px 18px', color: '#ffffff',
-                    fontFamily: "'Space Grotesk', sans-serif",
-                    fontSize: '1rem', lineHeight: 1.75,
-                    resize: 'vertical', outline: 'none', minHeight: '160px',
-                    transition: 'border-color 0.2s',
-                  }}
-                  placeholder="Enter the message to encode across GIF frames..."
-                  value={secret}
-                  onChange={e => setSecret(e.target.value)}
-                  onFocus={e => e.target.style.borderColor = ACCENT}
-                  onBlur={e => e.target.style.borderColor = '#1e1e1e'}
-                />
+                {label('Secret Message')}
+                {textarea({ placeholder: 'Enter the secret message...', value: secretMsg, onChange: e => setSecretMsg(e.target.value), tall: true })}
               </div>
             </div>
           </>
         ) : (
           <>
-            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1.5rem' }}>
-              <div>
-                {label('Stego GIF (GIF containing hidden message)')}
-                <UploadZone accept=".gif" label="stego GIF" onFile={setStegoGif} file={stegoGif} accentColor={ACCENT} />
-              </div>
-              <div>
-                {label('Detection Method')}
-                <div style={{ position: 'relative' }}>
-                  <select
-                    value={method}
-                    onChange={e => setMethod(e.target.value)}
-                    style={{
-                      width: '100%', backgroundColor: '#0f0f0f',
-                      border: '1px solid #1e1e1e', borderRadius: '6px',
-                      padding: '10px 40px 10px 14px', color: '#ffffff',
-                      fontFamily: "'Space Grotesk', sans-serif", fontSize: '1rem',
-                      outline: 'none', cursor: 'pointer', appearance: 'none',
-                    }}
-                  >
-                    {methods.map(m => <option key={m.id} value={m.id}>{m.label}</option>)}
-                  </select>
-                  <ChevronDown size={14} color="#aaa" style={{ position: 'absolute', right: '12px', top: '50%', transform: 'translateY(-50%)', pointerEvents: 'none' }} />
-                </div>
-                <p style={{ fontFamily: "'JetBrains Mono', monospace", fontSize: '0.75rem', color: '#888', marginTop: '6px' }}>
-                  // Must match the method used to encode
-                </p>
-                <div style={{
-                  marginTop: '1rem',
-                  backgroundColor: '#0f0f0f', border: '1px solid #1a1a1a',
-                  borderRadius: '6px', padding: '1rem 1.2rem',
-                  fontFamily: "'JetBrains Mono', monospace",
-                  fontSize: '0.82rem', color: '#aaa', lineHeight: 1.9,
-                }}>
-                  <p>// Decoding steps:</p>
-                  <p>1. Parse all GIF frames</p>
-                  <p>2. Analyze using selected method</p>
-                  <p>3. Extract and reconstruct bits</p>
-                  <p>4. Output hidden text</p>
-                </div>
-              </div>
+            <div>
+              {label('Stego GIF (upload to extract message)')}
+              <FileUpload id="upload-stego-gif" onFileSelect={setStegoGif} selectedFile={stegoGif} />
             </div>
           </>
         )}
@@ -168,19 +164,21 @@ export default function TextToGif() {
             onMouseEnter={e => e.target.style.opacity = '0.85'}
             onMouseLeave={e => e.target.style.opacity = '1'}
           >
-            {mode === 'encrypt' ? 'Encode into GIF →' : 'Extract from GIF →'}
+            {mode === 'encrypt' ? 'Inject Data into GIF →' : 'Extract Hidden Data →'}
           </button>
-          <span style={{ fontFamily: "'JetBrains Mono', monospace", fontSize: '0.68rem', color: '#2a2a2a' }}>
-            // Python API integration pending
-          </span>
         </div>
 
-        <OutputPanel
-          output={output}
-          type={mode === 'encrypt' ? 'image' : 'text'}
-          loading={loading}
-          accentColor={ACCENT}
-        />
+        {output && output.type === 'text' && (
+           <OutputPanel output={output.content} type="text" loading={loading} accentColor={ACCENT} />
+        )}
+
+        {output && output.type === 'image' && (
+          <div style={{ marginTop: '1rem', padding: '1rem', border: '1px solid #1e1e1e', borderRadius: '6px', backgroundColor: '#0f0f0f' }}>
+             {label('Encoded GIF (Right-click to Save)')}
+             <img src={output.content} alt="Output GIF" style={{ maxWidth: '100%', height: 'auto', borderRadius: '4px' }} />
+          </div>
+        )}
+
       </div>
     </PageLayout>
   )
