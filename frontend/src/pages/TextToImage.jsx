@@ -52,6 +52,9 @@ const FileUpload = ({ onFileSelect, selectedFile }) => (
   </div>
 )
 
+// TODO: For production, change this to your deployed backend URL
+const API_BASE_URL = "http://127.0.0.1:5050";
+
 export default function TextInImage() {
   const [mode, setMode] = useState('encrypt')
   const [coverImage, setCoverImage] = useState(null)
@@ -80,7 +83,7 @@ export default function TextInImage() {
         formData.append('secret_message', secretMsg);
 
         // DO NOT set Content-Type header manually when using FormData! The browser does it.
-        const response = await fetch('http://127.0.0.1:5050/api/encode-image', {
+        const response = await fetch(`${API_BASE_URL}/api/encode-image`, {
           method: 'POST',
           body: formData
         });
@@ -105,7 +108,7 @@ export default function TextInImage() {
         formData.append('stego_image', stegoImage);
 
         // CHANGED: Fixed this port from 5000 to 5050
-        const response = await fetch('http://127.0.0.1:5050/api/decode-image', {
+        const response = await fetch(`${API_BASE_URL}/api/decode-image`, {
           method: 'POST',
           body: formData
         });
